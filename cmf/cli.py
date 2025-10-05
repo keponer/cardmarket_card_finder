@@ -72,44 +72,46 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
             print(f"sellerHref={href}{suffix}")
         return 0
 
-    # Interactive multi-URL
+    # Interactive multi-URL with loop; reuse same cookie
     print("Step 1: Provide request details")
-    urls_raw = input("Enter one or more URLs to GET (comma-separated): ").strip()
     cookie_raw = input(
         "Enter Cookie header value(s). Paste only cookie pairs (e.g., name=value; name2=value2).\n"
         "If you pasted a Set-Cookie string with attributes, they will be ignored.\n> "
     ).strip()
     cookie = sanitize_cookie_header(cookie_raw)
-    if not urls_raw:
-        print("Error: at least one URL is required for the interactive flow.", file=sys.stderr)
-        return 2
-    url_list = [u.strip() for u in urls_raw.split(",") if u.strip()]
-    if not url_list:
-        print("Error: no valid URLs provided.", file=sys.stderr)
-        return 2
 
-    # Collect per URL lists (href, price)
-    per_url_lists: List[List[Tuple[str, Optional[str]]]] = []
-    for u in url_list:
-        try:
-            per_url_lists.append(collect_seller_items_for_url(u, cookie))
-        except Exception as exc:
-            print(f"Error processing {u}: {exc}", file=sys.stderr)
-            return 1
+    while True:
+        urls_raw = input("Enter one or more URLs to GET (comma-separated), or press Enter to quit: ").strip()
+        if not urls_raw:
+            break
+        url_list = [u.strip() for u in urls_raw.split(",") if u.strip()]
+        if not url_list:
+            print("Error: no valid URLs provided.", file=sys.stderr)
+            continue
 
-    # Intersection by href; aggregate prices preserving duplicates and order
-    href_sets = [set(h for (h, _p) in lst) for lst in per_url_lists]
-    common_hrefs = set.intersection(*href_sets) if len(href_sets) > 1 else href_sets[0]
-    if not common_hrefs:
-        print("Error: no common seller profiles found across provided URLs", file=sys.stderr)
-        return 1
+        per_url_lists: List[List[Tuple[str, Optional[str]]]] = []
+        for u in url_list:
+            try:
+                per_url_lists.append(collect_seller_items_for_url(u, cookie))
+            except Exception as exc:
+                print(f"Error processing {u}: {exc}", file=sys.stderr)
+                per_url_lists = []
+                break
+        if not per_url_lists:
+            continue
 
-    for href in sorted(common_hrefs):
-        prices: List[str] = []
-        for lst in per_url_lists:
-            for (h, p) in lst:
-                if h == href and p:
-                    prices.append(p)
-        print(f"sellerHref={href} | prices=[{', '.join(prices)}]")
+        href_sets = [set(h for (h, _p) in lst) for lst in per_url_lists]
+        common_hrefs = set.intersection(*href_sets) if len(href_sets) > 1 else href_sets[0]
+        if not common_hrefs:
+            print("Error: no common seller profiles found across provided URLs", file=sys.stderr)
+            continue
+
+        for href in sorted(common_hrefs):
+            prices: List[str] = []
+            for lst in per_url_lists:
+                for (h, p) in lst:
+                    if h == href and p:
+                        prices.append(p)
+            print(f"sellerHref={href} | prices=[{', '.join(prices)}]")
 
     return 0
