@@ -1,15 +1,15 @@
-## Card Market Finder - Hello Script
+## Card Market Finder
 
-This project contains a simple Python script, `collect_cards.py`, that:
+This project contains a Python CLI, `collect_cards.py`, which delegates to the `cmf/` package and:
 
 - Prints "Hello, World!" when run with no arguments.
 - Optionally performs an HTTP GET request to a provided URL with a specified `Cookie` header and prints the response body.
 - Optionally performs a multipart/form-data POST to a provided URL with form fields and file uploads.
-- From GET responses that return HTML, extracts hidden inputs `__cmtkn`, `idProduct`, and `isSingle` and prints their values (or an error if missing).
-- Also collects seller profile links under `span.seller-name.d-flex` → `span.d-flex.has-content-centered.me-1` → `a[href]` and prints each as `sellerHref=...` (or an error if none found).
-- Interactive mode supports multiple product URLs at once and prints only the seller profiles that are common to all provided URLs (intersection), paging through all result pages for each URL until completion.
+- From GET responses that return HTML, extracts hidden inputs `__cmtkn`, `idProduct`, and `isSingle` (or errors if missing).
+- Collects seller profile links and prices from `div.col-sellerProductInfo.col` (and legacy seller-name spans) and prints each as `sellerHref=... | price=...` (or an error if none found).
+- Interactive mode supports multiple product URLs at once and prints only the seller profiles common to all provided URLs (intersection), paging via AJAX (`newPage`) through all result pages per URL. Prices list shows all occurrences across inputs.
 
-The script uses only the Python standard library.
+The project uses only the Python standard library.
 
 ### Requirements
 
@@ -33,14 +33,13 @@ deactivate
 
 ### Usage
 
-Run the script with no flags for an interactive two-step flow (multi-URL supported):
+Run the CLI with no flags for an interactive multi-URL flow:
 
 ```powershell
 .\.venv\Scripts\python collect_cards.py
 # Step 1: you will be prompted for one or more URLs (comma-separated) and a Cookie header
-# For each URL, the script extracts tokens, then paginates via POST to load all seller rows
-# It prints only the seller profiles found in ALL the provided URLs (set intersection)
-# Step 2: the script continues/finishes based on the interactive flow
+# For each URL, tokens are extracted and AJAX pagination loads seller rows until newPage == -1
+# Output prints only sellers common to ALL URLs, with prices aggregated per seller as a list
 ```
 
 Fetch a URL with a Cookie header and print the response body:
@@ -60,7 +59,7 @@ Fetch a URL with a Cookie header and print the response body:
 
 Behavior:
 - If both `--url` and `--cookie` are provided, the script performs a GET request to `--url` with the `Cookie` header set to `--cookie`, and prints the response body using the declared response charset (or UTF-8 by default).
-- If neither is provided, the script enters the interactive two-step flow (prompt for one or more URLs and a Cookie). For each URL, it extracts needed hidden inputs and seller links from the initial page, then paginates POSTs to load additional rows until `newPage == -1`. It prints the intersection of seller profiles across all provided URLs.
+- If neither is provided, the CLI enters the interactive flow (prompt for URLs and a Cookie). For each URL, it extracts the required hidden inputs and seller links/prices from the initial page, then paginates POSTs to load additional rows until `newPage == -1`. It prints the intersection of seller profiles across all provided URLs, with all price occurrences listed per seller.
 - If only one of the two flags is provided, the script prints an error and exits with code 2.
 - If `--post-url` is provided (optionally with `--cookie`), the script sends a multipart/form-data POST request to that URL, including any `--form` fields and `--file` uploads; the response body is printed.
 
@@ -92,13 +91,13 @@ $tmp = New-Item -ItemType File -Path "$env:TEMP\cmf_sample.txt" -Force; Set-Cont
 
 ### Notes
 
-- Interactive cookie input: if you paste a full `Set-Cookie` line (with attributes like `path`, `expires`, `HttpOnly`, etc.), the script now keeps only cookie `name=value` pairs and discards attributes to form a valid `Cookie` header.
+- Interactive cookie input: if you paste a full `Set-Cookie` line (with attributes like `path`, `expires`, `HttpOnly`, etc.), the CLI keeps only cookie `name=value` pairs and discards attributes to form a valid `Cookie` header.
 - The script sets a simple `User-Agent` to avoid some servers rejecting requests with the default user agent.
 - Response bodies are decoded using the charset declared in the `Content-Type` header if present; otherwise UTF-8 is used with replacement for undecodable bytes.
 - No third-party dependencies are required.
 
 ### Updating this documentation
 
-If new flags or behaviors are added to `collect_cards.py`, please update the corresponding sections above (Usage, Command-line arguments, Exit codes, and Examples).
+If new flags or behaviors are added, update these sections (Usage, Command-line arguments, Exit codes, and Examples).
 
 
